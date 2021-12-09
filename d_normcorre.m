@@ -143,8 +143,11 @@ Y_temp = single(Y_temp);
 
 if nargin < 3 || isempty(template)
     if print_msg; fprintf('Registering the first %i frames just to obtain a good template....',init_batch); end
-    template_in = median(Y_temp,nd+1)+add_value;
+    template_in = median(Y_temp,nd+1)+add_value; %The template can be initialized by computing the median of the first "init_batch" frames 
     fftTemp = fftn(template_in);
+    %Since the template at the beginning might not be accurate, it is 
+    %usually a good practice to revisit the first few frames 
+    %and register them againagainst a more stabilized template
     for t = 1:size(Y_temp,nd+1)
         if nd == 2
             [~,Greg] = dftregistration_min_max(fftTemp,fftn(Y_temp(:,:,t)),us_fac,-max_shift,max_shift,options.phase_flag);
@@ -161,22 +164,59 @@ else
     template_in = single(template + add_value);
 end
 
-[d1,d2,d3,~] = size(Y_temp);
+[d1,d2,d3,~] = size(Y_temp); %x,y,z dimension for video (ignore T by using "~")
+%
 if nd == 2; d3 = 1; end
 %% setup grids for patches
+%Inputs:
+%grid_size: size of non-overlapping portion of each patch the grid 
+%in each direction (x-y-z) (ex: [32,32,1])
+%mot_uf:	upsampling factor for smoothing and refinement of motion field
+%(ex: [4, 4, 1])
 
+%Outputs:
+%xx_s: starting pt for each patch along x-axis (ex: [1,33])
+%xx_f: finishing pt for each patch along x-axis (ex: [32,64])
+%above 2 are determined by input grid_size[1]
+%xx_us: starting pt for each subpatch along x-axis 
+%(ex: [1     9    17    25    33    41    49    57])
+%xx_uf: similar to xx_us, but for finishing pt
+%(ex: [8    16    24    32    40    48    56    64])
+%xx_us and xx_uf are subpatches obtained from upsampling patch (xx_s and xx_f)
+%by a factor of mot_uf from patch
+
+%similar for y,z axes
 [xx_s,xx_f,yy_s,yy_f,zz_s,zz_f,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf] = construct_grid(grid_size,mot_uf,d1,d2,d3,min_patch_size);
+
+%initial shifts
 shifts = struct('shifts',cell(T,1),'shifts_up',cell(T,1),'diff',cell(T,1));
+
+%converts initial template (template_in) into a cell array with overlapping elements
 temp_cell = mat2cell_ov(template_in,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY);
+%Inputs: 
+%overlap_post:	size of overlapping region in each direction after upsampling
+%(ex: [32    32    16])
+
+%Output:
+% length(xx_us) x length(yy_us) cell array (ex: 8 ×16 cell array)
+% each cell array is the overlapping subpatch of input matrix(here's
+% template_in)
+% the cell array can be as big as (s_x + 2*o_x) x (s_y + 2*o_y) 
+% if it's not exceeding img size[1] x img size[2]
+% (ex: for one axis, grid_size/mot_uf + 2*overlap_post = 32/4+2*32 = 72)
+
 
 %% precompute some quantities that are used repetitively for template matching and applying shifts
 Nr = cell(size(temp_cell));
 Nc = cell(size(temp_cell));
 Np = cell(size(temp_cell));
-Bs = cell(size(temp_cell));
+Bs = cell(size(temp_cell));%Bs is the same size as temp_cell-- weight for 
+%each pixel in each overlapping subpatch
 for i = 1:length(xx_us)
     for j = 1:length(yy_us)
         for k = 1:length(zz_us)
+            %length(zz_us) = 1 for a 3D video (only has x,y,T instead of
+            %x,y,z,T)
             [nr,nc,np] = size(temp_cell{i,j,k});
             nr = ifftshift(-fix(nr/2):ceil(nr/2)-1);
             nc = ifftshift(-fix(nc/2):ceil(nc/2)-1);
@@ -184,6 +224,9 @@ for i = 1:length(xx_us)
             [Nc{i,j,k},Nr{i,j,k},Np{i,j,k}] = meshgrid(nc,nr,np);
             extended_grid = [max(xx_us(i)-overlap_post(1),1),min(xx_uf(i)+overlap_post(1),d1),max(yy_us(j)-overlap_post(2),1),min(yy_uf(j)+overlap_post(2),d2),max(zz_us(k)-overlap_post(3),1),min(zz_uf(k)+overlap_post(3),d3)];            
             Bs{i,j,k} = permute(construct_weights([xx_us(i),xx_uf(i),yy_us(j),yy_uf(j),zz_us(k),zz_uf(k)],extended_grid),[2,1,3]); 
+            %permute rearranges the dimensions of the weight array so that they 
+            %are in the order specified by the vector ORDER (ex:[ 2, 1, 3])
+            %TODO: change Bs!
         end
     end
 end
@@ -404,8 +447,13 @@ for it = 1:iter
                 gz = max(abs(reshape(diff(shifts_up,[],3),[],1)));
                 flag_interp = max([gx;gy;gz;0])<0.5;      % detect possible smearing
 
+                
                 if flag_interp    
                     Mf = cell2mat_ov_sum(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY,Bs) - add_value;
+                    % converts a cell array to a matrix when the cell elements overlap
+                    % merge registered overlapping subpatches using
+                    % weights Bs
+                    % this is inside the time-loop (for t = 1:T)
                 else            
                     Mf = cell2mat_ov(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY) - add_value;
                 end                             

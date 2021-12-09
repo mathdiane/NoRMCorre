@@ -17,7 +17,7 @@ function [M_final,shifts,template,options,col_shift] = normcorre(Y,options,templ
 % col_shift:        relative shift due to bi-directional scanning
 
 %% first determine filetype
-
+%number of dimension of images
 nd = 2 + (options.d3 > 1); %max(length(sizY)-1,2);                    % determine whether imaging is 2d or 3d
 
 if isa(Y,'char')

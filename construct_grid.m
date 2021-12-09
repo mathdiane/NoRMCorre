@@ -1,5 +1,5 @@
 function [xx_s,xx_f,yy_s,yy_f,zz_s,zz_f,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf] = construct_grid(grid_size,mot_uf,d1,d2,d3,min_patch_size)
-
+%mot_uf: upsampling factor for smoothing and refinement of motion field 
 xx_s = 1:grid_size(1):d1;
 yy_s = 1:grid_size(2):d2;
 zz_s = 1:grid_size(3):d3;

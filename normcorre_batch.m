@@ -11,7 +11,7 @@ function [M_final,shifts_g,template,options,col_shift] = normcorre_batch(Y,optio
 
 % OUTPUTS
 % M_final:          motion corrected data
-% shifts_up:        upsampled shifts
+% shifts_up:        upsampled shifts %normcorre.m doesn't have this
 % shifts:           originally calculated shifts
 % template:         calculated template
 
@@ -24,7 +24,7 @@ if isa(Y,'char')
         tiffInfo = imfinfo(Y);
         filetype = 'tif';
         T = length(tiffInfo);
-        sizY = [tiffInfo(1).Height,tiffInfo(1).Width,T];
+        sizY = [tiffInfo(1).Height,tiffInfo(1).Width,T];% assumes the input img is 2D
     elseif strcmpi(ext,'mat')
         filetype = 'mem';
         Y = matfile(Y,'Writable',true);

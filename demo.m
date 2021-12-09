@@ -13,6 +13,7 @@ if ~exist(name,'file')  % download file if it doesn't exist in the directory
 end
 
 tic; Y = read_file(name); toc; % read the file (optional, you can also pass the path in the function instead of Y)
+% Y from 'granule_love2.tif' is 64 x 128 x 4000 (frames)
 Y = single(Y);                 % convert to single precision 
 T = size(Y,ndims(Y));
 Y = Y - min(Y(:));
@@ -20,13 +21,23 @@ Y = Y - min(Y(:));
 
 options_rigid = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'bin_width',200,'max_shift',15,'us_fac',50,'init_batch',200);
 
-%% perform motion correction
+%% perform rigid motion correction (img level translation) (not in parallel)
 tic; [M1,shifts1,template1,options_rigid] = normcorre(Y,options_rigid); toc
-
-%% now try non-rigid motion correction (also in parallel)
+%time: 37.949212 seconds for viedo of size 64 x 128 x 4000
+%% now try non-rigid motion correction (in parallel)
+% non-rigid motion is approx. by pw-rigid motion through patch level
+% translation
 options_nonrigid = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200);
 tic; [M2,shifts2,template2,options_nonrigid] = normcorre_batch(Y,options_nonrigid); toc
+% the algorithm is implemented in the function ```normcorre.m```. 
+% If you have access to the parallel computing toolbox, then the function ```normcorre_batch.m``` can offer speed gains by enabling within mini-batch parallel processing.
+%time: 82.998566 seconds for viedo of size 64 x 128 x 4000
 
+%% try non-rigid motion correction (not in parallel)
+% Diane added
+tic; [M3,shifts3,template3,options_nonrigid] = normcorre(Y,options_nonrigid); toc
+%time: 142.769127 seconds for viedo of size 64 x 128 x 4000 (around 2x than
+%parallel: normcorre_batch)
 %% compute metrics
 
 nnY = quantile(Y(:),0.005);
