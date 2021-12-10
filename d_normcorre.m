@@ -16,6 +16,7 @@ function [M_final,shifts,template,options,col_shift] = normcorre(Y,options,templ
 % options:          options structure (if modified)
 % col_shift:        relative shift due to bi-directional scanning
 
+options = options_nonrigid; % for debugging TODO: remove this
 %% first determine filetype
 
 nd = 2 + (options.d3 > 1); %max(length(sizY)-1,2);                    % determine whether imaging is 2d or 3d
@@ -93,8 +94,8 @@ use_parallel = options.use_parallel;
 make_avi = options.make_avi;
 name = options.name;
 fr = options.fr;
-iter = options.iter;
-add_value = options.add_value;
+iter = options.iter;% ex: 1 from demo.m
+add_value = options.add_value; % ex: 0 from demo.m
 max_shift = options.max_shift;
 print_msg = options.print_msg;
 if strcmpi(options.boundary,'nan')
@@ -141,7 +142,10 @@ end
 data_type = class(Y_temp);
 Y_temp = single(Y_temp);
 
-if nargin < 3 || isempty(template)
+
+%if nargin < 3 || isempty(template) %nargin: number of input arguments
+%debugging purpose TODO: uncomment the above line; remove the line below
+if exist('template','var') == 0
     if print_msg; fprintf('Registering the first %i frames just to obtain a good template....',init_batch); end
     template_in = median(Y_temp,nd+1)+add_value; %The template can be initialized by computing the median of the first "init_batch" frames 
     fftTemp = fftn(template_in);
@@ -305,7 +309,7 @@ cnt_buf = 0;
 if print_msg; fprintf('Template initialization complete.  Now registering all the frames with new template. \n'); end
 %%
 prevstr = [];
-for it = 1:iter
+for it = 1:iter %iter = 1 from demo.m
     if it < iter; plot_flag = 0; else plot_flag = options.plot_flag; end
     for t = 1:T
         switch filetype
@@ -324,7 +328,7 @@ for it = 1:iter
         maxY = max(Yt(:));
         Yt = Yt + add_value;
         ind = rem(t,bin_width) + bin_width*(rem(t,bin_width)==0);
-        Yc = mat2cell_ov(Yt,xx_s,xx_f,yy_s,yy_f,zz_s,zz_f,overlap_pre,sizY);
+        Yc = mat2cell_ov(Yt,xx_s,xx_f,yy_s,yy_f,zz_s,zz_f,overlap_pre,sizY); % Yt in cell array format
         fftY = cellfun(@fftn, Yc, 'un',0);
         
         M_fin = cell(length(xx_us),length(yy_us),length(zz_us)); %zeros(size(Y_temp));
@@ -454,6 +458,7 @@ for it = 1:iter
                     % merge registered overlapping subpatches using
                     % weights Bs
                     % this is inside the time-loop (for t = 1:T)
+                    % TODO: change this with time-dependent Bs
                 else            
                     Mf = cell2mat_ov(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY) - add_value;
                 end                             
@@ -520,6 +525,7 @@ for it = 1:iter
         end         
         
         if mod(t,bin_width) == 0 && upd_template
+            % update template for every bin_width frames
             if print_msg
                 str=[num2str(t), ' out of ', num2str(T), ' frames registered, iteration ', num2str(it), ' out of ', num2str(iter), '..'];
                 refreshdisp(str, prevstr, t);
@@ -552,6 +558,8 @@ for it = 1:iter
         end        
         
         if plot_flag && mod(t,1) == 0
+            %nnY is 0.005 quantile of Y; mmY is 0.995 quantile of Y
+            %[nnY,mmY] specifies the scaling when plotting
             subplot(221); imagesc(Yt-add_value,[nnY,mmY]); title('Raw data','fontweight','bold','fontsize',14); 
                             xlabel(sprintf('Frame %i out of %i',t,T),'fontweight','bold','fontsize',14); set(gca,'Xtick',[],'Ytick',[]);
             subplot(222); imagesc(Mf,[nnY,mmY]);  title('Motion Corrected','fontweight','bold','fontsize',14); colormap('bone'); axis off;

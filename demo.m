@@ -28,6 +28,10 @@ tic; [M1,shifts1,template1,options_rigid] = normcorre(Y,options_rigid); toc
 % non-rigid motion is approx. by pw-rigid motion through patch level
 % translation
 options_nonrigid = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200);
+% 'plot_flag',1,'make_avi',1);
+%     'plot_flag          ' % flag for plotting results in real time (default: false)
+%     'make_avi           ' % flag for making movie (default: false)
+% but they would be very time-consuming (10x running time)
 tic; [M2,shifts2,template2,options_nonrigid] = normcorre_batch(Y,options_nonrigid); toc
 % the algorithm is implemented in the function ```normcorre.m```. 
 % If you have access to the parallel computing toolbox, then the function ```normcorre_batch.m``` can offer speed gains by enabling within mini-batch parallel processing.
