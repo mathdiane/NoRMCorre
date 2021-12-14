@@ -13,6 +13,8 @@ dftregistration.m
 
 *.h5
 
+*.asv
+
 demos/n*_demo.m
 old/*
 dev/*
