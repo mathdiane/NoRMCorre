@@ -32,10 +32,19 @@ Y = Y - min(Y(:)); %sclae Y s.t. min = 0
 corr_bidir = 0; %don't correct bi-directional scanning, s.t. shifts_method is still fft; default is 1
 % options could be changed in normcorre/normcorre_batch 
 % ex: if there's bidirectional scanning and
-% the options.shifts_method is 'fft' (which is true for both granule_love2.tif
-% and dNMF/.../original.tif), then
+% the options.shifts_method is 'fft', then
 % options.shifts_method would be changed to 'cubic'
 % options_XXX_ori: the original options before being changed
+
+%corr_bidir should be set to True for granule_love2.tif
+%because its img seems to be from bidirectional scanning when looking at
+%the img through eyes
+%plus the detected correction is larger (7 pixels)
+%corr_bidir can be set to False for dNMF example
+%because its img doesn't seem to be from bidirectional scanning when looking at
+%the img through eyes
+%plus the detected correction is smaller (-2 pixels)
+
 
 %running time for fft is ~2x of cubic for pw-rigid 
 options_rigid_ori = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'bin_width',200,'max_shift',15,'us_fac',50,'init_batch',200, 'correct_bidir', corr_bidir);
@@ -49,7 +58,9 @@ fprintf('---------- rigid ----------\n')
 tic; [M1,shifts1,template1,options_rigid] = normcorre(Y,options_rigid_ori); toc
 %corr_bidir = 1--> cubic shift
 %time: 37.949212 seconds for viedo of size 64 x 128 x 4000
-%time:  9.552002 seconds for video of size 64 x 128 x 1000
+%(granule: Offset 7.0e-01 pixels due to bidirectional scanning detected.)
+%time:  9.552002 seconds for video of size 64 x 128 x 1000 
+%(dNMF: Offset -2.0e-01 pixels due to bidirectional scanning detected. )
 %corr_bidir = 0, fft shift
 %time:  5.703990 seconds for video of size 64 x 128 x 1000
 %% now try non-rigid motion correction (in parallel)
