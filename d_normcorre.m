@@ -16,8 +16,8 @@ function [M_final,shifts,template,options,col_shift] = normcorre(Y,options,templ
 % options:          options structure (if modified)
 % col_shift:        relative shift due to bi-directional scanning
 
-options = options_nonrigid; % for debugging TODO: remove this
 %% first determine filetype
+%options = options_nonrigid_ori_plot; % for debugging TODO: remove this
 
 nd = 2 + (options.d3 > 1); %max(length(sizY)-1,2);                    % determine whether imaging is 2d or 3d
 
@@ -143,9 +143,9 @@ data_type = class(Y_temp);
 Y_temp = single(Y_temp);
 
 
-%if nargin < 3 || isempty(template) %nargin: number of input arguments
+if nargin < 3 || isempty(template) %nargin: number of input arguments
 %debugging purpose TODO: uncomment the above line; remove the line below
-if exist('template','var') == 0
+%if exist('template','var') == 0
     if print_msg; fprintf('Registering the first %i frames just to obtain a good template....',init_batch); end
     template_in = median(Y_temp,nd+1)+add_value; %The template can be initialized by computing the median of the first "init_batch" frames 
     fftTemp = fftn(template_in);
@@ -230,7 +230,6 @@ for i = 1:length(xx_us)
             Bs{i,j,k} = permute(construct_weights([xx_us(i),xx_uf(i),yy_us(j),yy_uf(j),zz_us(k),zz_uf(k)],extended_grid),[2,1,3]); 
             %permute rearranges the dimensions of the weight array so that they 
             %are in the order specified by the vector ORDER (ex:[ 2, 1, 3])
-            %TODO: change Bs!
         end
     end
 end
@@ -404,11 +403,15 @@ for it = 1:iter %iter = 1 from demo.m
                  shifts_temp(i,j,k,:) = shifts_cell{ii};
                  diff_temp(i,j,k) = diff_cell{ii};
             end            
-        end     
+        end%associated w/if ~use_parallel     
         shifts(t).shifts = shifts_temp;
         shifts(t).diff = diff_temp;
         
-        switch lower(options.shifts_method)
+        switch lower(options.shifts_method) 
+            % cubic from demo.m 
+            % (though options_nonrigid.shifts_method=='fft',
+            % options.shifts_method is changed to 'cubic' 
+            % cuz there's  bidirectional scanning is detected)
             case 'fft'
                 if any([length(xx_s),length(yy_s),length(zz_s)] > 1)
                     if ~isfield(options,'shifts_method'); options.shifts_method = 'FFT'; end                                         
@@ -451,19 +454,55 @@ for it = 1:iter %iter = 1 from demo.m
                 gz = max(abs(reshape(diff(shifts_up,[],3),[],1)));
                 flag_interp = max([gx;gy;gz;0])<0.5;      % detect possible smearing
 
-                
-                if flag_interp    
-                    Mf = cell2mat_ov_sum(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY,Bs) - add_value;
+                Bs_seg = Bs; %initialize
+                bg_w = 0.5; %weights for bg not in overlapping
+                if flag_interp
+                    %create deformable patch weights by gaussian filtered
+                    %and thresholded, then replace 0 by 0.5, and
+                    %element-wise multiply the trapezoidal weights Bs
+                    for  cell_ind= 1:(size(Bs,1)*size(Bs,2))
+                        one_ov_patch = M_fin{cell_ind}; %matrix of one overlapping subpatch
+                        %figure; imagesc(one_ov_patch); title('Original Overlapping Subpatch');%plot one overlapping subpatch 
+                        [one_ov_patch_seg, ~] = segmentByFiltering(one_ov_patch);%WormSegmentHessian3dStraighten(one_ov_patch);
+                        %one_ov_patch_seg: gaussian filtered and
+                        %thresholded--> {0,1}
+                        %2nd output can be used to find centroid: undergone
+                        % (1) band pass filter to separate closely
+                        % clustered neurons 
+                        % (2) remove small objects
+                        %figure; imagesc(one_ov_patch_seg); title('seg');
+                        
+                        %replace 0(bg) by bg_w (ex:0.5)
+                        one_ov_patch_seg_n = double(one_ov_patch_seg); %logical to numeric
+                        one_ov_patch_seg_n(~one_ov_patch_seg_n(:)) = bg_w;% {0.5, 1}
+                        %figure; imagesc(one_ov_patch_seg_n); title('Segmentation (Deformable Patch) weights');
+                        
+                        
+                        %figure;imagesc(Bs{cell_ind}); title('Trapezoidal weights');
+                        %elementwise multiplication w/trapezoidal by
+                        %reducing the weights on overlapping regions
+                        Bs_seg{cell_ind} = one_ov_patch_seg_n.*Bs{cell_ind};
+                        %figure;imagesc(Bs_seg{cell_ind}); title('Deformable Trapezoidal weights');
+                    end
+                    Mf = cell2mat_ov_sum(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY,Bs_seg) - add_value;
                     % converts a cell array to a matrix when the cell elements overlap
                     % merge registered overlapping subpatches using
-                    % weights Bs
+                    % weights
                     % this is inside the time-loop (for t = 1:T)
-                    % TODO: change this with time-dependent Bs
+                    % change stationary trapezoidal weights (Bs) with time-dependent deformable weights (Bs_seg)
+                    
+%                     figure;imagesc(Yt); title('Original (t = 1)');
+%                     figure;imagesc(Mf); title('Motion Corrected w/ Deformable Trapezoidal weights (t = 1)');
+%                     Mf_unif = cell2mat_ov(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY) - add_value; %uniform weights
+%                     figure;imagesc(Mf_unif); title('Motion Corrected w/ Uniform weights (t = 1)');
+%                     Mf_trap = cell2mat_ov_sum(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY,Bs) - add_value; %trapezoidal weights
+%                     figure;imagesc(Mf_trap); title('Motion Corrected w/ Trapezoidal weights (t = 1)');
                 else            
                     Mf = cell2mat_ov(M_fin,xx_us,xx_uf,yy_us,yy_uf,zz_us,zz_uf,overlap_post,sizY) - add_value;
                 end                             
         
-            otherwise
+            otherwise % options.shifts_method != 'fft'
+                if print_msg && t==1; fprintf('[Warning] options.shifts_method != `fft`; Bs would not be used at all \n'); end
                 shifts(t).shifts_up = shifts(t).shifts;
                 if nd == 3                
                     shifts_up = zeros([options.d1,options.d2,options.d3,3]);
@@ -491,11 +530,11 @@ for it = 1:iter %iter = 1 from demo.m
                     shifts_up = imresize(shifts_temp,[options.d1,options.d2]);
                     shifts_up(2:2:end,:,2) = shifts_up(2:2:end,:,2) + col_shift;
                     Mf = imwarp(Yt,-cat(3,shifts_up(:,:,2),shifts_up(:,:,1)),options.shifts_method,'FillValues',fill_value);  
-                end    
+                end %if nd == 3    
              
              Mf(Mf<minY) = minY;
              Mf(Mf>maxY) = maxY;  
-        end        
+        end %lower(options.shifts_method)         
             
         if ~strcmpi(options.output_type,'mat')
             rem_mem = rem(t,options.mem_batch_size);

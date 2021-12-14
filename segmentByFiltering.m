@@ -1,10 +1,16 @@
 function [im_bw_out,im_centroid]=...
     SegmentByFiltering(im,opt_seg,im_bp)
-% this function takes as an input an image with bright blobs and segments
-% it by looking at the eigenvalues of the hessian matrix. Objects can be
-% further seperated using a watershed filter based on the object size. An
-% optional 3rd input is a smoothed version of the image, which bypasses the
-% need to do a bpass filter in this code. 
+% this function takes as an input an image with bright blobs
+% outputs: 
+% im_bw_out: binarized gaussian filter smoothed img
+% im_centroid: expanded centroid img that segments the blobs 
+% im_centroid undergone the following steps:
+% (1) if smoothed image is an input, use it, otherwise, do a bpass filter
+% (tries to separate neurons close)
+% (2) convert to binary img through thresholding (thresh1)
+% (3) remove small objects using fx AreaFilter and the threshold minObjSize
+% An optional 3rd input is a smoothed version of the image, which bypasses 
+% the need to do a bpass filter for obtaining im_centroid in this code. 
 
 %% Initialize default parameters, all of these can also be fields in opt_seg
 thresh1 =.1; %initial Threshold for binarization
@@ -13,7 +19,7 @@ minObjSize=5; % min object size
 filterSize3=[3,3,4]; %bp filter size low f
 filterSize=[3,3]; %bp filter size low f
 noise=1; % bp filter hi f
-prefilter=0; % 0: creates im_bp through band pass filter
+prefilter=0; % 0: creates im_bp through band pass filter. 1: set im_bp by the original img (im_bp=im)
 gaussFilter=1; 
 plot_interm = 0; % plot intermediate result
 
