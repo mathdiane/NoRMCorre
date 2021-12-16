@@ -357,8 +357,8 @@ for it = 1:iter %iter = 1 from demo.m
                         M_temp = remove_boundaries(M_temp,output(3:end),'copy',template{i,j,k});
                         if nd == 2; buffer{i,j,k}(:,:,ind) = M_temp;  end    
                         if nd == 3; buffer{i,j,k}(:,:,:,ind) = M_temp;  end 
-                        shifts_temp(i,j,k,1) = output(3);
-                        shifts_temp(i,j,k,2) = output(4); 
+                        shifts_temp(i,j,k,1) = output(3);%shift in row
+                        shifts_temp(i,j,k,2) = output(4);%shift in col
                         diff_temp(i,j,k) = output(2);
                         if all([length(xx_s),length(yy_s),length(zz_s)] == 1)
                             M_fin{i,j,k} = remove_boundaries(M_temp,output(3:end),options.boundary,template{i,j,k},add_value);

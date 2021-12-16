@@ -145,14 +145,26 @@ patch_id = 1:size(shifts_x,2);
 str = strtrim(cellstr(int2str(patch_id.')));
 str = cellfun(@(x) ['patch # ',x],str,'un',0);
 
+% below are both roughly -0.7 for dNMF
+% means the correction improve more (cM1-cY or cM2-cY is larger) 
+% when img correlation is low (cY is small)
+% i.e. when there are more motion artifacts
+% corr(cY, cM1-cY)
+% corr(cY, cM2-cY)
+
+% below is roughly -0.3 for dNMF; 
+% didn't observe similar pattern as the chunk above
+% corr(cY, cM2 - cM1)
 figure;
-    ax1 = subplot(311); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',title1,title2); title('correlation coefficients','fontsize',14,'fontweight','bold')
+    ax0 = subplot(411); plot(1:T,cY-max(cY),1:T,(cM2 - cM1)/max(cM2 - cM1)); legend('shifted raw data (max = 0)',strcat('(',title2,'-',title1,')/diff_{max}')); title(strcat('correlation diff.( ',title2,' - ',title1,')'),'fontsize',14,'fontweight','bold')
+            set(gca,'Xtick',[])     
+    ax1 = subplot(412); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',title1,title2); title('correlation coefficients','fontsize',14,'fontweight','bold')
+            set(gca,'Xtick',[])       
+    ax2 = subplot(413); plot(shifts_x); hold on; plot(shifts_r(:,1),'--k','linewidth',2); title('displacements along x','fontsize',14,'fontweight','bold')
             set(gca,'Xtick',[])
-    ax2 = subplot(312); plot(shifts_x); hold on; plot(shifts_r(:,1),'--k','linewidth',2); title('displacements along x','fontsize',14,'fontweight','bold')
-            set(gca,'Xtick',[])
-    ax3 = subplot(313); plot(shifts_y); hold on; plot(shifts_r(:,2),'--k','linewidth',2); title('displacements along y','fontsize',14,'fontweight','bold')
+    ax3 = subplot(414); plot(shifts_y); hold on; plot(shifts_r(:,2),'--k','linewidth',2); title('displacements along y','fontsize',14,'fontweight','bold')
             xlabel('timestep','fontsize',14,'fontweight','bold')
-    linkaxes([ax1,ax2,ax3],'x')
+    linkaxes([ax0,ax2,ax3],'x')
 
 %% plot a movie with the results
 % commented out to save time when running the code
