@@ -30,6 +30,8 @@ function [output, Greg] = dftregistration_min_max(buf1ft,buf2ft,usfac,min_shift,
 %           within 1/usfac of a pixel. For example usfac = 20 means the
 %           images will be registered within 1/20 of a pixel. (default = 1)
 % max_shift Maximum shift in each dimension (2x1 vector). (default = Inf, no max)
+% phase_flag    In the case of high signal-to-noise ratio (SNR), phase
+%               correlation can be used by setting phase_flag to 1(logical).
 %
 % Outputs
 % output =  [error,diffphase,net_row_shift,net_col_shift]
@@ -92,7 +94,15 @@ if isscalar(max_shift); max_shift = max_shift*[1,1]; end
 Nr = ifftshift(-fix(nr/2):ceil(nr/2)-1);
 Nc = ifftshift(-fix(nc/2):ceil(nc/2)-1);
 
+%cross correlation
 buf_prod = buf1ft.*conj(buf2ft);
+%conj(buf2ft)<--> conj(flipped registered img). where flipped means (-x,-y)
+%in space
+%product in freq domain = conv. in time
+%so buf_prod in time domain is template img conv. w/conj(flipped registered img)
+%this is cross correlation because
+% img correlation = [conv. 2 imgs, but flip one upside-down and
+%left-to-right]
 if usfac == 0
     % Simple computation of error and phase difference without registration
     

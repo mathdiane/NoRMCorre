@@ -45,11 +45,16 @@ corr_bidir = 0; %don't correct bi-directional scanning, s.t. shifts_method is st
 %the img through eyes
 %plus the detected correction is smaller (-2 pixels)
 
+phase_corr = 0; %default: 0
+% In the case of high signal-to-noise ratio (SNR), phase
+% correlation can be used by setting phase_flag to 1(logical) of
+% options,when performing img registration
+
 
 %running time for fft is ~2x of cubic for pw-rigid 
-options_rigid_ori = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'bin_width',200,'max_shift',15,'us_fac',50,'init_batch',200, 'correct_bidir', corr_bidir);
-options_nonrigid_ori = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200, 'correct_bidir', corr_bidir);
-options_nonrigid_ori_plot = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200,'plot_flag',1,'make_avi',1, 'correct_bidir', corr_bidir);
+options_rigid_ori = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'bin_width',200,'max_shift',15,'us_fac',50,'init_batch',200, 'correct_bidir', corr_bidir, 'phase_flag', phase_corr);
+options_nonrigid_ori = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200, 'correct_bidir', corr_bidir, 'phase_flag', phase_corr);
+options_nonrigid_ori_plot = NoRMCorreSetParms('d1',size(Y,1),'d2',size(Y,2),'grid_size',[32,32],'mot_uf',4,'bin_width',200,'max_shift',15,'max_dev',3,'us_fac',50,'init_batch',200,'plot_flag',1,'make_avi',1, 'correct_bidir', corr_bidir, 'phase_flag', phase_corr);
 %     'plot_flag          ' % flag for plotting results in real time (default: false)
 %     'make_avi           ' % flag for making movie (default: false)
 % but they would be very time-consuming (10x running time)
