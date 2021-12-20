@@ -19,3 +19,5 @@ demos/n*_demo.m
 old/*
 dev/*
 demos/*
+outputs/*
+dNMF_colab_demo_data/*

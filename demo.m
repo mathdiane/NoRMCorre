@@ -1,9 +1,15 @@
 clear
 gcp;
 
-%simulated video from dNMF
-name = '..\dNMF\colab_demo_results\size_64_128_2_1000_30\original.tif';
-%size_x_y_z_T_K; K is the number of neurons, value ranges: [0,255]
+%% set file path
+output_root_folder = 'outputs\';
+
+%simulated video from Colab's dNMF demo.ipynb
+input_subfolder = 'size_64_128_2_1000_30_-80';
+input_folder = strcat('dNMF_colab_demo_data\',input_subfolder,'\');
+name = strcat(input_folder,'original.tif');
+%size_x_y_z_T_K_S; K is the number of neurons. S related to noise std.
+%Tif file value ranges: [0,255]
 %original.tif only looks at max along z, so the tif file size is [x y T]
 
 %original default demo data file froom NoRMCorre
@@ -28,7 +34,11 @@ T = size(Y,ndims(Y));
 Y = Y - min(Y(:)); %sclae Y s.t. min = 0
 %granule_love2.tif's Y now has the value range: [0,2735]
 
-% set parameters 
+%% set parameters 
+plot_mean_corr = 0; %plot mean img, correlation comparison btw different methods
+plot_shift_t = 0; % plot correlation and displacement over time
+
+
 corr_bidir = 0; %don't correct bi-directional scanning, s.t. shifts_method is still fft; default is 1
 % options could be changed in normcorre/normcorre_batch 
 % ex: if there's bidirectional scanning and
@@ -69,10 +79,10 @@ tic; [M1,shifts1,template1,options_rigid] = normcorre(Y,options_rigid_ori); toc
 %corr_bidir = 0, fft shift
 %time:  5.703990 seconds for video of size 64 x 128 x 1000
 %% now try non-rigid motion correction (in parallel)
-fprintf('---------- pw-rigid(parallel) ----------\n')
+%fprintf('---------- pw-rigid(parallel) ----------\n')
 % non-rigid motion is approx. by pw-rigid motion through patch level
 % translation
-tic; [M2,shifts2,template2,options_nonrigid2] = normcorre_batch(Y,options_nonrigid_ori); toc
+%tic; [M2,shifts2,template2,options_nonrigid2] = normcorre_batch(Y,options_nonrigid_ori); toc
 % the algorithm is implemented in the function ```normcorre.m```. 
 % If you have access to the parallel computing toolbox, then the function ```normcorre_batch.m``` can offer speed gains by enabling within mini-batch parallel processing.
 %corr_bidir = 1--> cubic shift
@@ -109,63 +119,90 @@ tic; [M5,shifts5,template5,options_nonrigid5] = d_normcorre(Y,options_nonrigid_o
 nnY = quantile(Y(:),0.005);
 mmY = quantile(Y(:),0.995);
 
+%motion corrected data for comparison
+corr0 = M1;
 corr1 = M3; %M1;
 corr2 = M5; %M2;
 
+shifts_c0 = shifts1;
 shifts_c1 = shifts3; %shifts1
 shifts_c2 = shifts5; %shifts2
 
-title1 = 'trapezoid';%'rigid';
-title2 = 'deformable';%'non-rigid';
+title0 = 'rigid';
+short_title1 = 'trapezoid';
+title1 = strcat('pw-rigid: ',short_title1);%'rigid';
+short_title2 = 'deformable';
+title2 = strcat('pw-rigid: ',short_title2);%'non-rigid';
+
 
 [cY,mY,vY] = motion_metrics(Y,10);
+[cM0,mM0,vM0] = motion_metrics(corr0,10);
 [cM1,mM1,vM1] = motion_metrics(corr1,10);
 [cM2,mM2,vM2] = motion_metrics(corr2,10);
+%outputs of motion_metrics:
+% cY:           correlation coefficient of each frame with the mean
+% mY:           mean image
+% ng:           norm of gradient of mean image
+
+output_folder = strcat(output_root_folder, input_subfolder,'\');
+if ~exist(output_folder, 'dir')
+    mkdir(output_folder)
+end
+
+fprintf('------------------------------\n');
+fprintf(strcat(input_subfolder,'\n'));
+fprintf('method  corr(mean)  (std)  crisp(mean img)\n');
+print_plot_motion_metrics(cY,mY,vY,'original', output_folder, 'original');
+print_plot_motion_metrics(cM0,mM0,vM0,title0, output_folder, title0);
+print_plot_motion_metrics(cM1,mM1,vM1,title1, output_folder, short_title1);
+print_plot_motion_metrics(cM2,mM2,vM2,title2, output_folder, short_title2);
 T = length(cY);
 %% plot metrics
-figure;
-    ax1 = subplot(2,3,1); imagesc(mY,[nnY,mmY]);  axis equal; axis tight; axis off; title('mean raw data','fontsize',14,'fontweight','bold')
-    ax2 = subplot(2,3,2); imagesc(mM1,[nnY,mmY]);  axis equal; axis tight; axis off; title('mean '+ string(title1)+' corrected','fontsize',14,'fontweight','bold')
-    ax3 = subplot(2,3,3); imagesc(mM2,[nnY,mmY]); axis equal; axis tight; axis off; title('mean '+ string(title2)+' corrected','fontsize',14,'fontweight','bold')
-    subplot(2,3,4); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',string(title1),string(title2)); title('correlation coefficients','fontsize',14,'fontweight','bold')
-    subplot(2,3,5); scatter(cY,cM1); hold on; plot([0.9*min(cY),1.05*max(cM1)],[0.9*min(cY),1.05*max(cM1)],'--r'); axis square;
-        xlabel('raw data','fontsize',14,'fontweight','bold'); ylabel(string(title1)+' corrected','fontsize',14,'fontweight','bold');
-    subplot(2,3,6); scatter(cM1,cM2); hold on; plot([0.9*min(cY),1.05*max(cM1)],[0.9*min(cY),1.05*max(cM1)],'--r'); axis square;
-        xlabel('rigid corrected','fontsize',14,'fontweight','bold'); ylabel(string(title2)+' corrected','fontsize',14,'fontweight','bold');
-    linkaxes([ax1,ax2,ax3],'xy')
+if plot_mean_corr
+    figure;
+        ax1 = subplot(2,3,1); imagesc(mY,[nnY,mmY]);  axis equal; axis tight; axis off; title('mean raw data','fontsize',14,'fontweight','bold')
+        ax2 = subplot(2,3,2); imagesc(mM1,[nnY,mmY]);  axis equal; axis tight; axis off; title('mean '+ string(short_title1)+' corrected','fontsize',14,'fontweight','bold')
+        ax3 = subplot(2,3,3); imagesc(mM2,[nnY,mmY]); axis equal; axis tight; axis off; title('mean '+ string(short_title2)+' corrected','fontsize',14,'fontweight','bold')
+        subplot(2,3,4); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',string(short_title1),string(short_title2)); title('correlation coefficients','fontsize',14,'fontweight','bold')
+        subplot(2,3,5); scatter(cY,cM1); hold on; plot([0.9*min(cY),1.05*max(cM1)],[0.9*min(cY),1.05*max(cM1)],'--r'); axis square;
+            xlabel('raw data','fontsize',14,'fontweight','bold'); ylabel(string(short_title1)+' corrected','fontsize',14,'fontweight','bold');
+        subplot(2,3,6); scatter(cM1,cM2); hold on; plot([0.9*min(cY),1.05*max(cM1)],[0.9*min(cY),1.05*max(cM1)],'--r'); axis square;
+            xlabel('rigid corrected','fontsize',14,'fontweight','bold'); ylabel(string(short_title2)+' corrected','fontsize',14,'fontweight','bold');
+        linkaxes([ax1,ax2,ax3],'xy')
+end
 %% plot shifts        
+if plot_shift_t
+    shifts_r = squeeze(cat(3,shifts_c1(:).shifts));
+    shifts_nr = cat(ndims(shifts_c2(1).shifts)+1,shifts_c2(:).shifts);
+    shifts_nr = reshape(shifts_nr,[],ndims(Y)-1,T);
+    shifts_x = squeeze(shifts_nr(:,1,:))';
+    shifts_y = squeeze(shifts_nr(:,2,:))';
 
-shifts_r = squeeze(cat(3,shifts_c1(:).shifts));
-shifts_nr = cat(ndims(shifts_c2(1).shifts)+1,shifts_c2(:).shifts);
-shifts_nr = reshape(shifts_nr,[],ndims(Y)-1,T);
-shifts_x = squeeze(shifts_nr(:,1,:))';
-shifts_y = squeeze(shifts_nr(:,2,:))';
+    patch_id = 1:size(shifts_x,2);
+    str = strtrim(cellstr(int2str(patch_id.')));
+    str = cellfun(@(x) ['patch # ',x],str,'un',0);
 
-patch_id = 1:size(shifts_x,2);
-str = strtrim(cellstr(int2str(patch_id.')));
-str = cellfun(@(x) ['patch # ',x],str,'un',0);
+    % below are both roughly -0.7 for dNMF
+    % means the correction improve more (cM1-cY or cM2-cY is larger) 
+    % when img correlation is low (cY is small)
+    % i.e. when there are more motion artifacts
+    % corr(cY, cM1-cY)
+    % corr(cY, cM2-cY)
 
-% below are both roughly -0.7 for dNMF
-% means the correction improve more (cM1-cY or cM2-cY is larger) 
-% when img correlation is low (cY is small)
-% i.e. when there are more motion artifacts
-% corr(cY, cM1-cY)
-% corr(cY, cM2-cY)
-
-% below is roughly -0.3 for dNMF; 
-% didn't observe similar pattern as the chunk above
-% corr(cY, cM2 - cM1)
-figure;
-    ax0 = subplot(411); plot(1:T,cY-max(cY),1:T,(cM2 - cM1)/max(cM2 - cM1)); legend('shifted raw data (max = 0)',strcat('(',title2,'-',title1,')/diff_{max}')); title(strcat('correlation diff.( ',title2,' - ',title1,')'),'fontsize',14,'fontweight','bold')
-            set(gca,'Xtick',[])     
-    ax1 = subplot(412); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',title1,title2); title('correlation coefficients','fontsize',14,'fontweight','bold')
-            set(gca,'Xtick',[])       
-    ax2 = subplot(413); plot(shifts_x); hold on; plot(shifts_r(:,1),'--k','linewidth',2); title('displacements along x','fontsize',14,'fontweight','bold')
-            set(gca,'Xtick',[])
-    ax3 = subplot(414); plot(shifts_y); hold on; plot(shifts_r(:,2),'--k','linewidth',2); title('displacements along y','fontsize',14,'fontweight','bold')
-            xlabel('timestep','fontsize',14,'fontweight','bold')
-    linkaxes([ax0,ax2,ax3],'x')
-
+    % below is roughly -0.3 for dNMF; 
+    % didn't observe similar pattern as the chunk above
+    % corr(cY, cM2 - cM1)
+    figure;
+        ax0 = subplot(411); plot(1:T,cY-max(cY),1:T,(cM2 - cM1)/max(cM2 - cM1)); legend('shifted raw data (max = 0)',strcat('(',short_title2,'-',short_title1,')/diff_{max}')); title(strcat('correlation diff.( ',short_title2,' - ',short_title1,')'),'fontsize',14,'fontweight','bold')
+                set(gca,'Xtick',[])     
+        ax1 = subplot(412); plot(1:T,cY,1:T,cM1,1:T,cM2); legend('raw data',short_title1,short_title2); title('correlation coefficients','fontsize',14,'fontweight','bold')
+                set(gca,'Xtick',[])       
+        ax2 = subplot(413); plot(shifts_x); hold on; plot(shifts_r(:,1),'--k','linewidth',2); title('displacements along x','fontsize',14,'fontweight','bold')
+                set(gca,'Xtick',[])
+        ax3 = subplot(414); plot(shifts_y); hold on; plot(shifts_r(:,2),'--k','linewidth',2); title('displacements along y','fontsize',14,'fontweight','bold')
+                xlabel('timestep','fontsize',14,'fontweight','bold')
+        linkaxes([ax0,ax2,ax3],'x')
+end
 %% plot a movie with the results
 % commented out to save time when running the code
 % figure;
@@ -178,3 +215,4 @@ figure;
 %     drawnow;
 %     pause(0.02);
 % end
+
